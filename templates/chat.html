@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>날씨 코디 챗봇</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 20px auto; padding: 10px; background:#f6f7fb; }
+        h1 { text-align:center; color:#2c3e50; }
+        #chatbox { border:1px solid #ddd; background:white; padding:12px; height:400px; overflow-y:auto; border-radius:6px; }
+        .msg { margin:8px 0; }
+        .user { text-align:right; color:#0b7dda; }
+        .bot { text-align:left; color:#2d7a2d; }
+        #inputArea { display:flex; margin-top:10px; }
+        #message { flex:1; padding:10px; font-size:1rem; border:1px solid #ccc; border-radius:6px; }
+        button { padding:10px 14px; margin-left:8px; background:#3498db; color:white; border:none; border-radius:6px; cursor:pointer; }
+        pre { white-space:pre-wrap; word-break:break-word; }
+    </style>
+</head>
+<body>
+    <h1>날씨 코디 챗봇 (GPT 없음)</h1>
+    <div id="chatbox">
+        <div class="msg bot"><strong>봇:</strong> 안녕하세요! 먼저 <em>지역(예: 서울)</em>을 입력해주세요.</div>
+    </div>
+
+    <div id="inputArea">
+        <input id="message" placeholder="메시지를 입력하고 Enter 또는 전송 버튼을 누르세요">
+        <button id="sendBtn">전송</button>
+    </div>
+
+    <script>
+        const chatbox = document.getElementById("chatbox");
+        const messageInput = document.getElementById("message");
+        const sendBtn = document.getElementById("sendBtn");
+
+        function appendMessage(who, text) {
+            const div = document.createElement("div");
+            div.className = "msg " + (who === "user" ? "user" : "bot");
+            if (who === "user") {
+                div.innerHTML = `<strong>나:</strong> ${text}`;
+            } else {
+                div.innerHTML = `<strong>봇:</strong> <pre>${text}</pre>`;
+            }
+            chatbox.appendChild(div);
+            chatbox.scrollTop = chatbox.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const msg = messageInput.value.trim();
+            if (!msg) return;
+            appendMessage("user", msg);
+            messageInput.value = "";
+            sendBtn.disabled = true;
+
+            try {
+                const res = await fetch("/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ message: msg })
+                });
+                const data = await res.json();
+                appendMessage("bot", data.reply);
+            } catch (e) {
+                appendMessage("bot", "서버와 통신 중 오류가 발생했습니다.");
+            } finally {
+                sendBtn.disabled = false;
+            }
+        }
+
+        sendBtn.addEventListener("click", sendMessage);
+        messageInput.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") sendMessage();
+        });
+    </script>
+</body>
+</html>
