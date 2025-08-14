@@ -1,38 +1,66 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <title>캐릭터 선택</title>
-  <style>
-    body { font-family: Arial, sans-serif; max-width: 680px; margin: 40px auto; background:#f6f7fb; }
-    h1 { color:#2c3e50; text-align:center; }
-    form { background:#fff; padding:16px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,.08); }
-    .persona { margin:12px 0; }
-    button { margin-top:10px; padding:10px 14px; background:#3498db; color:#fff; border:none; border-radius:6px; cursor:pointer; }
-    .hint { color:#777; margin:8px 0 16px; }
-    .list { margin:12px 0; padding:0 12px; color:#333; }
-  </style>
+    <meta charset="UTF-8">
+    <title>캐릭터 선택</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            text-align: center;
+            background-color: #f9f9f9;
+            padding: 20px;
+        }
+        h1 {
+            margin-bottom: 30px;
+        }
+        .character-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 30px;
+        }
+        .character-card {
+            background: white;
+            border-radius: 15px;
+            padding: 15px;
+            width: 150px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .character-card:hover {
+            transform: scale(1.05);
+        }
+        .character-img {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 50%;
+            border: 2px solid #ccc;
+            margin-bottom: 10px;
+        }
+        button {
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 16px;
+            color: #333;
+        }
+    </style>
 </head>
 <body>
-  <h1>원하는 스타일의 챗봇을 선택하세요</h1>
-  <div class="hint">캐릭터마다 말투와 코디 추천 스타일이 달라요!</div>
-  <form method="post" action="/start">
-    <div class="persona">
-      {% for key, name in personas.items() %}
-        <label style="display:block; margin:6px 0;">
-          <input type="radio" name="persona" value="{{ key }}" {% if loop.first %}checked{% endif %}>
-          <strong>{{ name }}</strong>
-        </label>
-      {% endfor %}
+    <h1>캐릭터를 선택하세요</h1>
+    <div class="character-container">
+        {% for key, name in characters.items() %}
+        <form action="/start_chat" method="post" style="display:inline;">
+            <input type="hidden" name="character" value="{{ key }}">
+            <div class="character-card">
+                <img src="{{ url_for('static', filename='images/' + key + '.png') }}" alt="{{ name }}" class="character-img">
+                <button type="submit">{{ name }}</button>
+            </div>
+        </form>
+        {% endfor %}
     </div>
-    <ul class="list">
-      <li><strong>트렌디 전문가</strong>: 유행/스트릿 감성</li>
-      <li><strong>실속파 코디 장인</strong>: 현실적인 옷장 조합</li>
-      <li><strong>럭셔리 스타일리스트</strong>: 고급스러운 무드</li>
-      <li><strong>귀여운 패션 친구</strong>: 상냥한 톤 & 가벼운 포인트</li>
-      <li><strong>신사 스타일 챗봇</strong>: 포멀·세미포멀 중심의 품격 있는 추천</li>
-    </ul>
-    <button type="submit">선택 완료</button>
-  </form>
 </body>
 </html>
+
