@@ -6,93 +6,92 @@
     <style>
         body {
             font-family: 'Segoe UI', sans-serif;
-            background-color: #f9f9f9;
+            background-color: #fafafa;
             padding: 20px;
         }
         h1 {
             text-align: center;
         }
-        #chat-box {
+        .chat-box {
+            width: 100%;
+            max-width: 600px;
+            margin: auto;
             background: white;
             border-radius: 10px;
             padding: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             height: 400px;
             overflow-y: auto;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-            margin-bottom: 15px;
         }
         .message {
-            margin-bottom: 10px;
-        }
-        .user {
-            color: blue;
-            font-weight: bold;
+            margin: 8px 0;
         }
         .bot {
-            color: green;
-            font-weight: bold;
+            color: #333;
         }
-        #user-input {
-            width: 80%;
+        .user {
+            color: #007BFF;
+            text-align: right;
+        }
+        .input-area {
+            display: flex;
+            justify-content: center;
+            margin-top: 10px;
+        }
+        input {
+            flex: 1;
             padding: 8px;
-            border-radius: 5px;
+            border-radius: 8px;
             border: 1px solid #ccc;
         }
-        #send-btn {
+        button {
+            margin-left: 8px;
             padding: 8px 15px;
             border: none;
-            background-color: #4CAF50;
+            border-radius: 8px;
+            background: #4CAF50;
             color: white;
-            border-radius: 5px;
             cursor: pointer;
         }
-        #send-btn:hover {
-            background-color: #45a049;
+        button:hover {
+            background: #45a049;
         }
     </style>
 </head>
 <body>
     <h1>{{ character }}</h1>
-    <div id="chat-box"></div>
-    <input type="text" id="user-input" placeholder="메시지를 입력하세요">
-    <button id="send-btn">전송</button>
+    <div class="chat-box" id="chat-box">
+        <div class="message bot">안녕하세요! 먼저 지역을 입력해주세요.</div>
+    </div>
+
+    <div class="input-area">
+        <input type="text" id="user-input" placeholder="메시지를 입력하세요">
+        <button onclick="sendMessage()">전송</button>
+    </div>
 
     <script>
-        const chatBox = document.getElementById("chat-box");
-        const userInput = document.getElementById("user-input");
-        const sendBtn = document.getElementById("send-btn");
+        function sendMessage() {
+            const input = document.getElementById("user-input");
+            const msg = input.value.trim();
+            if (!msg) return;
 
-        function appendMessage(sender, text) {
-            const msg = document.createElement("div");
-            msg.classList.add("message");
-            msg.innerHTML = `<span class="${sender}">${sender === 'user' ? '사용자' : '챗봇'}:</span> ${text}`;
-            chatBox.appendChild(msg);
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
-
-        sendBtn.addEventListener("click", () => {
-            const text = userInput.value.trim();
-            if (!text) return;
-            appendMessage("user", text);
-            userInput.value = "";
+            const chatBox = document.getElementById("chat-box");
+            chatBox.innerHTML += `<div class="message user">${msg}</div>`;
 
             fetch("/chat", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ message: text })
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({message: msg})
             })
             .then(res => res.json())
             .then(data => {
-                appendMessage("bot", data.reply);
+                chatBox.innerHTML += `<div class="message bot">${data.reply}</div>`;
+                chatBox.scrollTop = chatBox.scrollHeight;
             });
-        });
 
-        userInput.addEventListener("keypress", (e) => {
-            if (e.key === "Enter") sendBtn.click();
-        });
-
-        // 첫 메시지
-        appendMessage("bot", "지역을 입력해주세요 (예: 서울, 부산, 제주 등)");
+            input.value = "";
+        }
     </script>
 </body>
 </html>
+

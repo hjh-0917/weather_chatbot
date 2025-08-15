@@ -6,8 +6,8 @@
     <style>
         body {
             font-family: 'Segoe UI', sans-serif;
+            background-color: #f4f4f4;
             text-align: center;
-            background-color: #f9f9f9;
             padding: 20px;
         }
         h1 {
@@ -21,12 +21,11 @@
         }
         .character-card {
             background: white;
+            padding: 20px;
             border-radius: 15px;
-            padding: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             width: 150px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-            cursor: pointer;
-            transition: transform 0.2s;
+            transition: transform 0.2s ease-in-out;
         }
         .character-card:hover {
             transform: scale(1.05);
@@ -40,27 +39,33 @@
             margin-bottom: 10px;
         }
         button {
+            background-color: #4CAF50;
+            color: white;
             border: none;
-            background: none;
+            padding: 8px 12px;
+            border-radius: 8px;
             cursor: pointer;
-            font-size: 16px;
-            color: #333;
+        }
+        button:hover {
+            background-color: #45a049;
         }
     </style>
 </head>
 <body>
-    <h1>캐릭터를 선택하세요</h1>
+    <h1>패션 코디 챗봇 캐릭터 선택</h1>
     <div class="character-container">
         {% for key, name in characters.items() %}
-        <form action="/start_chat" method="post" style="display:inline;">
-            <input type="hidden" name="character" value="{{ key }}">
-            <div class="character-card">
-                <img src="{{ url_for('static', filename='images/' + key + '.png') }}" alt="{{ name }}" class="character-img">
-                <button type="submit">{{ name }}</button>
-            </div>
-        </form>
+        <div class="character-card">
+            <img src="{{ url_for('static', filename='images/' + key + '.png') }}" alt="{{ name }}" class="character-img">
+            <p>{{ name }}</p>
+            <form action="/start_chat" method="post">
+                <input type="hidden" name="character" value="{{ key }}">
+                <button type="submit">선택</button>
+            </form>
+        </div>
         {% endfor %}
     </div>
 </body>
 </html>
+
 
