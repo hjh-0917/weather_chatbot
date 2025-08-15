@@ -7,21 +7,26 @@
         body {
             font-family: 'Segoe UI', sans-serif;
             background-color: #fafafa;
-            padding: 20px;
-        }
-        h1 {
-            text-align: center;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
         }
         .chat-box {
+            display: flex;
+            flex-direction: column;
             width: 100%;
             max-width: 600px;
-            margin: auto;
+            height: 80vh;
             background: white;
             border-radius: 10px;
             padding: 15px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            height: 400px;
+        }
+        .messages {
+            flex: 1;
             overflow-y: auto;
+            margin-bottom: 10px;
         }
         .message {
             margin: 8px 0;
@@ -35,16 +40,14 @@
         }
         .input-area {
             display: flex;
-            justify-content: center;
-            margin-top: 10px;
         }
-        input {
+        .input-area input {
             flex: 1;
             padding: 8px;
             border-radius: 8px;
             border: 1px solid #ccc;
         }
-        button {
+        .input-area button {
             margin-left: 8px;
             padding: 8px 15px;
             border: none;
@@ -53,20 +56,20 @@
             color: white;
             cursor: pointer;
         }
-        button:hover {
+        .input-area button:hover {
             background: #45a049;
         }
     </style>
 </head>
 <body>
-    <h1>{{ character }}</h1>
-    <div class="chat-box" id="chat-box">
-        <div class="message bot">안녕하세요! 먼저 지역을 입력해주세요.</div>
-    </div>
-
-    <div class="input-area">
-        <input type="text" id="user-input" placeholder="메시지를 입력하세요">
-        <button onclick="sendMessage()">전송</button>
+    <div class="chat-box">
+        <div class="messages" id="chat-box">
+            <div class="message bot">안녕하세요! 먼저 지역을 입력해주세요.</div>
+        </div>
+        <div class="input-area">
+            <input type="text" id="user-input" placeholder="메시지를 입력하세요">
+            <button onclick="sendMessage()">전송</button>
+        </div>
     </div>
 
     <script>
@@ -94,4 +97,3 @@
     </script>
 </body>
 </html>
-
