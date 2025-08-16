@@ -6,7 +6,7 @@ from flask import Flask, render_template, request, session
 app = Flask(__name__)
 app.secret_key = "your_secret_key"
 
-OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "YOUR_KEY_HERE")
+OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 
 CHAR_LABEL_KO = {
     "trendy": "트렌디 스타일러",
