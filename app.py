@@ -119,4 +119,8 @@ def chat():
         return result
 
     return "입력을 다시 확인해주세요."
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
+
 
