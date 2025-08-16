@@ -1,413 +1,36 @@
-from flask import Flask, render_template, request, jsonify, session
-import os, requests, random
+from flask import Flask, render_template, request, session, jsonify
+import os
+import requests
 
 app = Flask(__name__)
 app.secret_key = "secret_key_for_session"
 
+# -----------------------------
+# OpenWeather API
+# -----------------------------
 API_KEY = os.environ.get("OPENWEATHER_API_KEY")
 
-# 한글 → 영어 도시명 (필요한 것만 우선)
-K2E = {
-    "서울": "Seoul", "부산": "Busan", "대구": "Daegu",
-    "인천": "Incheon", "광주": "Gwangju", "대전": "Daejeon",
-    "울산": "Ulsan", "제주": "Jeju"
+# 한글 → 영문 도시명 (대표 도시 위주)
+KOR2ENG = {
+    "서울": "Seoul", "부산": "Busan", "대구": "Daegu", "인천": "Incheon", "광주": "Gwangju",
+    "대전": "Daejeon", "울산": "Ulsan", "세종": "Sejong", "수원": "Suwon", "창원": "Changwon",
+    "춘천": "Chuncheon", "청주": "Cheongju", "전주": "Jeonju", "포항": "Pohang", "제주": "Jeju",
+    "김해": "Gimhae", "용인": "Yongin", "성남": "Seongnam", "안양": "Anyang", "의정부": "Uijeongbu"
 }
 
-# 캐릭터 목록 (템플릿에서 사용)
-CHARACTERS = {
-    "trendy": "트렌디 전문가",
-    "practical": "실속파 코디 장인",
-    "luxury": "럭셔리 스타일리스트",
-    "cute": "귀여운 패션 친구",
-    "gentle": "신사 스타일러"
+GENDER_KO = {"male": "남성", "female": "여성"}
+CHAR_LABEL_KO = {
+    "trendy": "트렌디 스타일러",
+    "gentle": "신사 스타일러",
+    "cute": "큐트 스타일러",
+    "practical": "프랙티컬 스타일러",
+    "luxury": "럭셔리 스타일러",
 }
 
-# ---- 핵심: 캐릭터 × 성별 × 나이대 × 날씨별 아이템 풀 ----
-# 각 리스트에서 랜덤 조합으로 결과 생성
-OUTFITS = {
-    "trendy": {
-        "남성": {
-            "10대": {
-                "더움": {
-                    "top": ["그래픽 오버핏 티", "메쉬 나시", "파스텔 스트라이프 셔츠"],
-                    "bottom": ["와이드 카고 쇼츠", "데님 반바지", "크롭 조거"],
-                    "outer": [],
-                    "shoes": ["청키 스니커즈", "스포츠 샌들", "캔버스"],
-                    "acc": ["버킷햇", "실버 체인", "스포츠 캡"]
-                },
-                "선선": {
-                    "top": ["오버핏 후드", "루즈 셔츠", "니트 폴로"],
-                    "bottom": ["와이드 데님", "카고 팬츠", "테크 조거"],
-                    "outer": ["데님 자켓", "MA-1", "코치 자켓"],
-                    "shoes": ["레트로 스니커즈", "하이탑", "첼시 부츠"],
-                    "acc": ["비니", "크로스백", "슬링백"]
-                },
-                "추움": {
-                    "top": ["헤비 후드", "플리스 풀오버", "터틀넥 니트"],
-                    "bottom": ["기모 조거", "블랙 슬림진", "카고 팬츠"],
-                    "outer": ["숏패딩", "롱패딩", "보아 플리스"],
-                    "shoes": ["워커", "하이탑", "러너"],
-                    "acc": ["목도리", "비니", "백팩"]
-                }
-            },
-            "20대": {
-                "더움": {
-                    "top": ["린넨 셔츠", "크롭 셔츠", "니트 탱크"],
-                    "bottom": ["턱 와이드 슬랙스", "테크 쇼츠", "연청 반바지"],
-                    "outer": [],
-                    "shoes": ["미니멀 스니커즈", "스트랩 샌들", "로퍼"],
-                    "acc": ["볼캡", "체인 브레이슬릿", "선글라스"]
-                },
-                "선선": {
-                    "top": ["니트 폴로", "레이어드 셔츠", "스웨트"],
-                    "bottom": ["와이드 치노", "크리즈 데님", "슬랙스"],
-                    "outer": ["바시티 자켓", "가죽 자켓", "코치 자켓"],
-                    "shoes": ["첼시 부츠", "더비", "레트로 스니커즈"],
-                    "acc": ["크로스백", "비니", "벨트"]
-                },
-                "추움": {
-                    "top": ["터틀넥", "헤비 니트", "플리스 집업"],
-                    "bottom": ["울 슬랙스", "진청 데님", "조거"],
-                    "outer": ["울 코트", "롱패딩", "다운 점퍼"],
-                    "shoes": ["워커", "첼시 부츠", "하이탑"],
-                    "acc": ["머플러", "가죽 장갑", "비니"]
-                }
-            },
-            "30대": {
-                "더움": {
-                    "top": ["오픈칼라 셔츠", "피케 폴로", "리넨 블렌드 니트"],
-                    "bottom": ["테이퍼드 치노", "린넨 팬츠", "테일러드 쇼츠"],
-                    "outer": [],
-                    "shoes": ["레더 로퍼", "미니멀 스니커즈", "샌들"],
-                    "acc": ["레더 벨트", "시계", "선글라스"]
-                },
-                "선선": {
-                    "top": ["파인 게이지 니트", "옥스포드 셔츠", "셔츠+니트베스트"],
-                    "bottom": ["테이퍼드 슬랙스", "스트레이트 데님", "치노"],
-                    "outer": ["트러커 자켓", "가죽 자켓", "언스트럭처드 블레이저"],
-                    "shoes": ["더비", "첼시 부츠", "로퍼"],
-                    "acc": ["가죽 카드지갑", "머플러", "토트"]
-                },
-                "추움": {
-                    "top": ["캐시미어 터틀넥", "울 니트", "기모 셔츠"],
-                    "bottom": ["플란넬 슬랙스", "네이비 울 팬츠", "진청 데님"],
-                    "outer": ["체스터 코트", "다운 코트", "숏패딩"],
-                    "shoes": ["레더 부츠", "더비", "첼시"],
-                    "acc": ["가죽 장갑", "울 머플러", "브리프케이스"]
-                }
-            },
-            "40대이상": {
-                "더움": {
-                    "top": ["리넨 셔츠", "피케 폴로", "시어서커 셔츠"],
-                    "bottom": ["플리츠 치노", "린넨 팬츠", "테일러드 쇼츠"],
-                    "outer": [],
-                    "shoes": ["페니 로퍼", "가죽 샌들", "미니멀 스니커즈"],
-                    "acc": ["클래식 워치", "레더 벨트", "선글라스"]
-                },
-                "선선": {
-                    "top": ["메리노 니트", "셔츠+가디건", "니트 폴로"],
-                    "bottom": ["슬랙스", "크리즈 데님", "치노"],
-                    "outer": ["트렌치 코트", "수에이드 자켓", "블레이저"],
-                    "shoes": ["더비", "첼시", "로퍼"],
-                    "acc": ["실크 스카프", "카드월렛", "토트"]
-                },
-                "추움": {
-                    "top": ["캐시미어 터틀넥", "울 니트", "브러시드 셔츠"],
-                    "bottom": ["울 슬랙스", "헤비 데님", "플란넬 팬츠"],
-                    "outer": ["더블 코트", "핸드메이드 코트", "다운"],
-                    "shoes": ["레더 부츠", "더비", "첼시"],
-                    "acc": ["가죽 장갑", "캐시미어 머플러", "페도라(선택)"]
-                }
-            }
-        },
-        "여성": {
-            "10대": {
-                "더움": {
-                    "top": ["크롭티", "슬리브리스 탑", "시스루 셔츠"],
-                    "bottom": ["테니스 스커트", "데님 쇼츠", "와이드 팬츠"],
-                    "outer": [],
-                    "shoes": ["청키 스니커즈", "샌들", "캔버스"],
-                    "acc": ["버킷햇", "미니 숄더백", "체인 목걸이"]
-                },
-                "선선": {
-                    "top": ["카라 니트", "루즈 스웨트", "크롭 가디건"],
-                    "bottom": ["하이웨스트 데님", "카고 스커트", "와이드 슬랙스"],
-                    "outer": ["바시티", "숏 트렌치", "라이더"],
-                    "shoes": ["레트로 스니커즈", "첼시 부츠", "로퍼"],
-                    "acc": ["비니", "미니 크로스", "헤어클립"]
-                },
-                "추움": {
-                    "top": ["터틀넥", "플리스 집업", "케이블 니트"],
-                    "bottom": ["기모 와이드", "블랙 스키니", "롱 스커트"],
-                    "outer": ["숏패딩", "롱패딩", "울 코트"],
-                    "shoes": ["앵클 부츠", "워커", "하이탑"],
-                    "acc": ["머플러", "비니", "토트"]
-                }
-            },
-            "20대": {
-                "더움": {
-                    "top": ["민소매 니트", "리넨 블라우스", "크롭 셔츠"],
-                    "bottom": ["와이드 팬츠", "테일러드 쇼츠", "플레어 스커트"],
-                    "outer": [],
-                    "shoes": ["스트랩 샌들", "로퍼", "미니멀 스니커즈"],
-                    "acc": ["미니 숄더백", "선글라스", "펜던트"]
-                },
-                "선선": {
-                    "top": ["블라우스", "니트", "셔츠+니트 베스트"],
-                    "bottom": ["크리즈 데님", "슬랙스", "미디 스커트"],
-                    "outer": ["트렌치", "숏 코트", "트위드 자켓"],
-                    "shoes": ["메리제인", "로퍼", "앵클 부츠"],
-                    "acc": ["미니 크로스", "스카프", "워치"]
-                },
-                "추움": {
-                    "top": ["터틀넥", "울 니트", "기모 블라우스"],
-                    "bottom": ["울 슬랙스", "니트 스커트", "헤비 데님"],
-                    "outer": ["롱 코트", "롱 다운", "무톤"],
-                    "shoes": ["앵클 부츠", "레더 부츠", "하이엔드 스니커즈"],
-                    "acc": ["머플러", "가죽 장갑", "숄더백"]
-                }
-            },
-            "30대": {
-                "더움": {
-                    "top": ["리넨 원피스 탑", "실크 블라우스", "니트 탑"],
-                    "bottom": ["세미와이드 슬랙스", "린넨 스커트", "테일러드 쇼츠"],
-                    "outer": [],
-                    "shoes": ["로퍼", "스트랩 샌들", "미들힐"],
-                    "acc": ["심플 펜던트", "레더 벨트", "토트"]
-                },
-                "선선": {
-                    "top": ["파인 니트", "셔츠+가디건", "니트 폴로"],
-                    "bottom": ["플리츠 스커트", "크리즈 데님", "슬랙스"],
-                    "outer": ["트렌치", "울 자켓", "라이트 코트"],
-                    "shoes": ["로퍼", "메리제인", "앵클 부츠"],
-                    "acc": ["실크 스카프", "레더 숄더백", "워치"]
-                },
-                "추움": {
-                    "top": ["캐시미어 터틀넥", "울 니트", "기모 블라우스"],
-                    "bottom": ["울 슬랙스", "니트 스커트", "헤비 데님"],
-                    "outer": ["핸드메이드 코트", "롱 다운", "울 코트"],
-                    "shoes": ["앵클 부츠", "레더 부츠", "로퍼"],
-                    "acc": ["머플러", "가죽 장갑", "핸드백"]
-                }
-            },
-            "40대이상": {
-                "더움": {
-                    "top": ["실크 블라우스", "린넨 셔츠", "니트 탑"],
-                    "bottom": ["세미와이드 슬랙스", "린넨 스커트", "테일러드 쇼츠"],
-                    "outer": [],
-                    "shoes": ["로퍼", "스트랩 샌들", "미들힐"],
-                    "acc": ["진주 이어링", "토트백", "선글라스"]
-                },
-                "선선": {
-                    "top": ["파인 캐시미어 니트", "실크 셔츠", "니트 폴로"],
-                    "bottom": ["플리츠 스커트", "슬랙스", "크리즈 데님"],
-                    "outer": ["버진울 코트", "수에이드 재킷", "트위드 자켓"],
-                    "shoes": ["로퍼", "메리제인", "앵클 부츠"],
-                    "acc": ["실크 스카프", "클래식 워치", "레더 숄더백"]
-                },
-                "추움": {
-                    "top": ["캐시미어 터틀넥", "울 니트", "플리스 라이너 탑"],
-                    "bottom": ["울 슬랙스", "니트 스커트", "헤비 데님"],
-                    "outer": ["핸드메이드 코트", "롱 다운", "울 코트"],
-                    "shoes": ["레더 부츠", "앵클 부츠", "로퍼"],
-                    "acc": ["캐시미어 머플러", "가죽 장갑", "이어머프"]
-                }
-            }
-        }
-    },
-    # ---- 실속파 ----
-    "practical": {
-        "남성": {
-            "10대": {
-                "더움": {"top": ["기능성 반팔", "쿨맥스 폴로"], "bottom": ["코튼 반바지", "라이트 치노"], "outer": [], "shoes": ["통기성 스니커즈", "샌들"], "acc": ["캡 모자", "가벼운 백팩"]},
-                "선선": {"top": ["맨투맨", "헨리넥 티"], "bottom": ["일자 데님", "치노"], "outer": ["라이트 윈드브레이커"], "shoes": ["데일리 스니커즈"], "acc": ["캔버스 토트"]},
-                "추움": {"top": ["기모 스웨트", "히트텍 폴로"], "bottom": ["기모 치노", "두꺼운 데님"], "outer": ["경량 패딩"], "shoes": ["방한 스니커즈"], "acc": ["니트 비니", "머플러"]}
-            },
-            "20대": {
-                "더움": {"top": ["린넨 셔츠", "기능성 티"], "bottom": ["치노 쇼츠", "슬랙스"], "outer": [], "shoes": ["로퍼", "스니커즈"], "acc": ["심플 시계"]},
-                "선선": {"top": ["얇은 니트", "옥스포드 셔츠"], "bottom": ["치노", "슬랙스"], "outer": ["코튼 자켓", "가디건"], "shoes": ["로퍼", "스니커즈"], "acc": ["토트백"]},
-                "추움": {"top": ["울 니트", "기모 후디"], "bottom": ["울 슬랙스", "데님"], "outer": ["파카", "울 코트"], "shoes": ["워커", "첼시"], "acc": ["머플러", "장갑"]}
-            },
-            "30대": {
-                "더움": {"top": ["피케 폴로", "리넨 셔츠"], "bottom": ["세미와이드 치노", "린넨 팬츠"], "outer": [], "shoes": ["로퍼", "미니멀 스니커즈"], "acc": ["가죽 벨트"]},
-                "선선": {"top": ["파인 니트", "셔츠"], "bottom": ["슬랙스", "스트레이트 데님"], "outer": ["코튼 트렌치", "니트 가디건"], "shoes": ["더비", "로퍼"], "acc": ["스카프"]},
-                "추움": {"top": ["케이블 니트", "터틀넥"], "bottom": ["울 슬랙스", "헤비 데님"], "outer": ["경량 롱패딩", "울 코트"], "shoes": ["부츠", "로퍼"], "acc": ["머플러", "비니"]}
-            },
-            "40대이상": {
-                "더움": {"top": ["리넨 셔츠", "쿨터치 폴로"], "bottom": ["린넨 팬츠", "치노"], "outer": [], "shoes": ["로퍼", "샌들"], "acc": ["클래식 시계"]},
-                "선선": {"top": ["니트", "셔츠+가디건"], "bottom": ["슬랙스", "치노"], "outer": ["코튼 트렌치"], "shoes": ["로퍼", "더비"], "acc": ["스카프", "토트"]},
-                "추움": {"top": ["울 니트", "기모 셔츠"], "bottom": ["울 슬랙스", "데님"], "outer": ["울 코트", "후드 파카"], "shoes": ["부츠"], "acc": ["머플러", "장갑"]}
-            }
-        },
-        "여성": {
-            "10대": {
-                "더움": {"top": ["기능성 반팔", "린넨 블라우스"], "bottom": ["코튼 쇼츠", "A라인 스커트"], "outer": [], "shoes": ["통기성 스니커즈", "플랫 샌들"], "acc": ["햇", "작은 크로스백"]},
-                "선선": {"top": ["라이트 가디건", "니트 티"], "bottom": ["일자 데님", "미디 스커트"], "outer": ["숏 패딩 베스트"], "shoes": ["플랫슈즈", "로퍼"], "acc": ["스카프"]},
-                "추움": {"top": ["케이블 니트", "기모 후디"], "bottom": ["기모 레깅스", "롱 스커트"], "outer": ["경량 롱패딩"], "shoes": ["앵클 부츠"], "acc": ["비니", "장갑"]}
-            },
-            "20대": {
-                "더움": {"top": ["린넨 블라우스", "슬리브리스 니트"], "bottom": ["통바지", "A라인"], "outer": [], "shoes": ["플랫 샌들", "로퍼"], "acc": ["슬림 벨트"]},
-                "선선": {"top": ["셔츠", "니트"], "bottom": ["세미와이드", "미디 스커트"], "outer": ["코튼 트렌치"], "shoes": ["플랫슈즈", "로퍼"], "acc": ["토트백"]},
-                "추움": {"top": ["터틀넥", "케이블 니트"], "bottom": ["울 슬랙스", "롱 스커트"], "outer": ["울 코트", "후드 파카"], "shoes": ["앵클 부츠"], "acc": ["머플러", "장갑"]}
-            },
-            "30대": {
-                "더움": {"top": ["니트 탑", "린넨 셔츠"], "bottom": ["세미와이드", "린넨 스커트"], "outer": [], "shoes": ["로퍼", "샌들"], "acc": ["펜던트", "토트"]},
-                "선선": {"top": ["파인 니트", "셔츠+가디건"], "bottom": ["슬랙스", "플리츠"], "outer": ["라이트 코트"], "shoes": ["로퍼", "앵클"], "acc": ["스카프", "워치"]},
-                "추움": {"top": ["터틀넥", "울 니트"], "bottom": ["울 슬랙스", "니트 스커트"], "outer": ["울 코트", "롱패딩"], "shoes": ["앵클 부츠"], "acc": ["머플러", "장갑"]}
-            },
-            "40대이상": {
-                "더움": {"top": ["실크 블라우스", "린넨 셔츠"], "bottom": ["세미와이드", "린넨 스커트"], "outer": [], "shoes": ["로퍼", "미들힐"], "acc": ["토트백"]},
-                "선선": {"top": ["캐시미어 니트", "니트 폴로"], "bottom": ["슬랙스", "크리즈 데님"], "outer": ["울 자켓"], "shoes": ["로퍼", "메리제인"], "acc": ["실크 스카프"]},
-                "추움": {"top": ["캐시미어 터틀넥", "울 니트"], "bottom": ["울 슬랙스", "헤비 데님"], "outer": ["핸드메이드 코트"], "shoes": ["레더 부츠"], "acc": ["가죽 장갑", "머플러"]}
-            }
-        }
-    },
-    # ---- 럭셔리 ----
-    "luxury": {
-        "남성": {
-            "10대": {
-                "더움": {"top": ["리넨 셔츠"], "bottom": ["테일러드 쇼츠"], "outer": [], "shoes": ["미니멀 스니커즈"], "acc": ["선글라스"]},
-                "선선": {"top": ["파인 니트"], "bottom": ["슬랙스"], "outer": ["수에이드 자켓"], "shoes": ["로퍼"], "acc": ["카드월렛"]},
-                "추움": {"top": ["메리노 니트"], "bottom": ["울 팬츠"], "outer": ["캐시미어 코트"], "shoes": ["더비"], "acc": ["머플러"]}
-            },
-            "20대": {
-                "더움": {"top": ["실크 혼방 셔츠", "피케 폴로"], "bottom": ["라이트 울 슬랙스", "린넨 팬츠"], "outer": [], "shoes": ["스웨이드 로퍼", "레더 샌들"], "acc": ["레더 벨트", "선글라스"]},
-                "선선": {"top": ["캐시미어 니트", "옥스포드 셔츠"], "bottom": ["테일러드 슬랙스"], "outer": ["언스트럭처드 블레이저", "가죽 재킷"], "shoes": ["페니 로퍼", "첼시"], "acc": ["실크 스카프", "클래식 워치"]},
-                "추움": {"top": ["캐시미어 터틀넥"], "bottom": ["플란넬 슬랙스"], "outer": ["더블 코트", "다운 재킷"], "shoes": ["더비", "레더 부츠"], "acc": ["가죽 장갑"]}
-            },
-            "30대": {
-                "더움": {"top": ["리넨 블렌드 니트", "오픈칼라 셔츠"], "bottom": ["테일러드 쇼츠", "린넨 팬츠"], "outer": [], "shoes": ["로퍼", "미니멀 스니커즈"], "acc": ["레더 카드지갑"]},
-                "선선": {"top": ["파인 캐시미어"], "bottom": ["버진울 팬츠", "크리즈 데님"], "outer": ["수에이드 자켓", "블레이저"], "shoes": ["더비", "첼시"], "acc": ["실크 타이(선택)"]},
-                "추움": {"top": ["캐시미어 터틀넥", "울 셔츠"], "bottom": ["테일러드 팬츠"], "outer": ["핸드메이드 코트"], "shoes": ["레더 부츠"], "acc": ["캐시미어 머플러"]}
-            },
-            "40대이상": {
-                "더움": {"top": ["실크 셔츠"], "bottom": ["린넨 팬츠"], "outer": [], "shoes": ["로퍼"], "acc": ["클래식 워치"]},
-                "선선": {"top": ["캐시미어 니트"], "bottom": ["테일러드 슬랙스"], "outer": ["트위드/수에이드 자켓"], "shoes": ["더비"], "acc": ["실크 스카프"]},
-                "추움": {"top": ["캐시미어 터틀넥"], "bottom": ["플란넬 슬랙스"], "outer": ["더블 코트"], "shoes": ["레더 부츠"], "acc": ["가죽 장갑"]}
-            }
-        },
-        "여성": {
-            "10대": {
-                "더움": {"top": ["리넨 탑"], "bottom": ["테일러드 쇼츠"], "outer": [], "shoes": ["미니멀 스니커즈"], "acc": ["미니 레더백"]},
-                "선선": {"top": ["울 혼방 탑"], "bottom": ["크리즈 데님"], "outer": ["트위드 자켓"], "shoes": ["메리제인"], "acc": ["진주 이어링"]},
-                "추움": {"top": ["울 니트"], "bottom": ["헤비 데님"], "outer": ["울 코트"], "shoes": ["앵클 부츠"], "acc": ["머플러"]}
-            },
-            "20대": {
-                "더움": {"top": ["실크 블라우스", "캐시미어 슬리브리스"], "bottom": ["실크 스커트", "린넨 팬츠"], "outer": [], "shoes": ["스트랩 샌들", "로퍼"], "acc": ["미니 레더백", "선글라스"]},
-                "선선": {"top": ["파인 캐시미어 니트", "실크 셔츠"], "bottom": ["테일러드 팬츠", "플리츠 스커트"], "outer": ["버진울 코트", "수에이드 재킷"], "shoes": ["메리제인", "로퍼"], "acc": ["실크 스카프", "클래식 워치"]},
-                "추움": {"top": ["캐시미어 터틀넥", "울 니트"], "bottom": ["울 슬랙스", "니트 스커트"], "outer": ["핸드메이드 코트", "롱 다운"], "shoes": ["레더 부츠"], "acc": ["가죽 장갑", "머플러"]}
-            },
-            "30대": {
-                "더움": {"top": ["실크 블라우스", "리넨 원피스 탑"], "bottom": ["세미와이드", "실크 스커트"], "outer": [], "shoes": ["로퍼", "샌들"], "acc": ["펄 네클리스"]},
-                "선선": {"top": ["울 혼방 탑", "파인 니트"], "bottom": ["테일러드 팬츠", "플리츠"], "outer": ["울 코트", "트위드"], "shoes": ["로퍼", "앵클"], "acc": ["미니 숄더백"]},
-                "추움": {"top": ["캐시미어 터틀넥"], "bottom": ["울 슬랙스"], "outer": ["핸드메이드 코트"], "shoes": ["레더 부츠"], "acc": ["캐시미어 머플러"]}
-            },
-            "40대이상": {
-                "더움": {"top": ["실크 블라우스"], "bottom": ["린넨 스커트"], "outer": [], "shoes": ["미들힐"], "acc": ["진주 귀걸이"]},
-                "선선": {"top": ["파인 캐시미어"], "bottom": ["슬랙스", "플리츠"], "outer": ["버진울 코트"], "shoes": ["로퍼", "메리제인"], "acc": ["실크 스카프"]},
-                "추움": {"top": ["캐시미어 터틀넥"], "bottom": ["울 슬랙스"], "outer": ["롱 코트"], "shoes": ["레더 부츠"], "acc": ["가죽 장갑"]}
-            }
-        }
-    },
-    # ---- 큐트 & 신사는 위 트렌디/프랙티컬/럭셔리에서 톤만 다르게 구성했지만 아이템도 별도 ----
-    "cute": {
-        "남성": {
-            "10대": {
-                "더움": {"top": ["파스텔 티셔츠", "소프트 폴로"], "bottom": ["밴딩 쇼츠", "라이트 치노"], "outer": [], "shoes": ["캔버스", "샌들"], "acc": ["볼캡", "캔버스 토트"]},
-                "선선": {"top": ["부클 가디건", "파스텔 스웨트"], "bottom": ["세미와이드 데님", "코튼 팬츠"], "outer": ["코튼 재킷"], "shoes": ["로퍼", "스니커즈"], "acc": ["미니 크로스"]},
-                "추움": {"top": ["케이블 니트", "폴라 니트"], "bottom": ["기모 조거", "일자 데님"], "outer": ["더플 코트", "숏패딩"], "shoes": ["앵클 부츠", "워커"], "acc": ["니트 비니", "머플러"]}
-            },
-            "20대": {
-                "더움": {"top": ["오버핏 니트 티", "파스텔 셔츠"], "bottom": ["와이드 치노"], "outer": [], "shoes": ["미니멀 스니커즈"], "acc": ["얇은 팔찌"]},
-                "선선": {"top": ["니트 베스트+셔츠", "라이트 니트"], "bottom": ["코튼 팬츠"], "outer": ["숏 트렌치"], "shoes": ["로퍼"], "acc": ["베레모(선택)"]},
-                "추움": {"top": ["모헤어 니트"], "bottom": ["울 팬츠"], "outer": ["울 코트"], "shoes": ["앵클 부츠"], "acc": ["머플러"]}
-            },
-            "30대": {
-                "더움": {"top": ["라운드 니트 티"], "bottom": ["세미와이드 치노"], "outer": [], "shoes": ["로퍼", "스니커즈"], "acc": ["가죽 벨트"]},
-                "선선": {"top": ["파인 니트"], "bottom": ["슬랙스"], "outer": ["코튼 코트"], "shoes": ["로퍼"], "acc": ["스카프"]},
-                "추움": {"top": ["폴라 니트"], "bottom": ["울 슬랙스"], "outer": ["울 코트"], "shoes": ["부츠"], "acc": ["장갑"]}
-            },
-            "40대이상": {
-                "더움": {"top": ["니트 폴로"], "bottom": ["테이퍼드 치노"], "outer": [], "shoes": ["로퍼"], "acc": ["토트"]},
-                "선선": {"top": ["케이블 니트"], "bottom": ["슬랙스"], "outer": ["트렌치"], "shoes": ["로퍼"], "acc": ["스카프"]},
-                "추움": {"top": ["울 니트"], "bottom": ["플란넬"], "outer": ["핸드메이드 코트"], "shoes": ["부츠"], "acc": ["머플러"]}
-            }
-        },
-        "여성": {
-            "10대": {
-                "더움": {"top": ["프릴 블라우스", "리본 슬리브리스"], "bottom": ["플레어 스커트", "데님 쇼츠"], "outer": [], "shoes": ["메리제인", "샌들"], "acc": ["헤어리본", "미니 숄더백"]},
-                "선선": {"top": ["가디건+탑 셋업", "케이블 니트"], "bottom": ["플리츠 스커트", "세미와이드"], "outer": ["숏 코트"], "shoes": ["플랫", "로퍼"], "acc": ["베레모", "리본 스카프"]},
-                "추움": {"top": ["터틀넥", "모헤어 니트"], "bottom": ["울 롱스커트", "기모 레깅스"], "outer": ["더플 코트", "롱패딩"], "shoes": ["퍼 안감 부츠"], "acc": ["퍼 머플러", "귀도리"]}
-            },
-            "20대": {
-                "더움": {"top": ["리본 블라우스", "크롭 니트"], "bottom": ["플레어", "와이드"], "outer": [], "shoes": ["샌들", "메리제인"], "acc": ["미니 크로스"]},
-                "선선": {"top": ["니트 베스트+셔츠", "파스텔 니트"], "bottom": ["미디 스커트"], "outer": ["트렌치"], "shoes": ["플랫", "로퍼"], "acc": ["헤어핀"]},
-                "추움": {"top": ["케이블 니트"], "bottom": ["니트 스커트"], "outer": ["울 코트"], "shoes": ["앵클"], "acc": ["머플러"]}
-            },
-            "30대": {
-                "더움": {"top": ["니트 탑"], "bottom": ["세미와이드"], "outer": [], "shoes": ["로퍼"], "acc": ["펜던트"]},
-                "선선": {"top": ["파인 니트"], "bottom": ["슬랙스"], "outer": ["라이트 코트"], "shoes": ["로퍼"], "acc": ["스카프"]},
-                "추움": {"top": ["폴라 니트"], "bottom": ["울 슬랙스"], "outer": ["핸드메이드 코트"], "shoes": ["앵클"], "acc": ["머플러"]}
-            },
-            "40대이상": {
-                "더움": {"top": ["니트 폴로"], "bottom": ["테일러드 쇼츠"], "outer": [], "shoes": ["로퍼"], "acc": ["토트"]},
-                "선선": {"top": ["케이블 니트"], "bottom": ["플리츠"], "outer": ["트렌치"], "shoes": ["로퍼"], "acc": ["스카프"]},
-                "추움": {"top": ["울 니트"], "bottom": ["헤비 데님"], "outer": ["울 코트"], "shoes": ["부츠"], "acc": ["머플러"]}
-            }
-        }
-    },
-    # ---- 신사 ----
-    "gentle": {
-        "남성": {
-            "10대": {
-                "더움": {"top": ["린넨 셔츠"], "bottom": ["테이퍼드 치노"], "outer": [], "shoes": ["미니멀 스니커즈"], "acc": ["가죽 벨트"]},
-                "선선": {"top": ["셔츠+니트 베스트"], "bottom": ["슬랙스"], "outer": ["트렌치"], "shoes": ["더비"], "acc": ["워치"]},
-                "추움": {"top": ["울 니트"], "bottom": ["플란넬"], "outer": ["체스터 코트"], "shoes": ["첼시"], "acc": ["머플러"]}
-            },
-            "20대": {
-                "더움": {"top": ["피케 폴로", "옥스포드 셔츠"], "bottom": ["라이트 슬랙스", "린넨 팬츠"], "outer": [], "shoes": ["로퍼", "미니멀 스니커즈"], "acc": ["레더 벨트", "시계"]},
-                "선선": {"top": ["메리노 니트", "니트 폴로"], "bottom": ["테이퍼드 슬랙스", "스트레이트 데님"], "outer": ["언스트럭처드 블레이저", "수에이드 자켓"], "shoes": ["더비", "첼시"], "acc": ["실크 타이(선택)", "카드지갑"]},
-                "추움": {"top": ["캐시미어 터틀넥", "울 셔츠"], "bottom": ["플란넬 슬랙스", "네이비 울 팬츠"], "outer": ["체스터필드 코트", "더블 코트"], "shoes": ["레더 부츠", "더비"], "acc": ["가죽 장갑", "울 머플러"]}
-            },
-            "30대": {
-                "더움": {"top": ["리넨 셔츠", "피케 폴로"], "bottom": ["테일러드 쇼츠", "치노"], "outer": [], "shoes": ["로퍼"], "acc": ["클래식 워치"]},
-                "선선": {"top": ["파인 니트", "셔츠"], "bottom": ["슬랙스", "크리즈 데님"], "outer": ["트렌치", "블레이저"], "shoes": ["더비", "첼시"], "acc": ["실크 스카프"]},
-                "추움": {"top": ["터틀넥", "울 니트"], "bottom": ["테일러드 팬츠"], "outer": ["체스터 코트"], "shoes": ["부츠"], "acc": ["장갑"]}
-            },
-            "40대이상": {
-                "더움": {"top": ["시어서커 셔츠", "리넨 셔츠"], "bottom": ["플리츠 치노"], "outer": [], "shoes": ["로퍼"], "acc": ["페도라(선택)"]},
-                "선선": {"top": ["메리노 니트", "셔츠+가디건"], "bottom": ["슬랙스"], "outer": ["트렌치", "수에이드"], "shoes": ["더비"], "acc": ["실크 타이(선택)"]},
-                "추움": {"top": ["캐시미어 터틀넥"], "bottom": ["플란넬"], "outer": ["핸드메이드 코트"], "shoes": ["레더 부츠"], "acc": ["캐시미어 머플러"]}
-            }
-        },
-        "여성": {
-            "10대": {
-                "더움": {"top": ["니트 탑"], "bottom": ["테일러드 쇼츠"], "outer": [], "shoes": ["로퍼"], "acc": ["펜던트"]},
-                "선선": {"top": ["셔츠+가디건"], "bottom": ["미디 스커트"], "outer": ["라이트 코트"], "shoes": ["로퍼"], "acc": ["스카프"]},
-                "추움": {"top": ["울 니트"], "bottom": ["플리츠"], "outer": ["울 코트"], "shoes": ["앵클"], "acc": ["머플러"]}
-            },
-            "20대": {
-                "더움": {"top": ["실크 블라우스", "니트 탑"], "bottom": ["세미와이드 슬랙스", "린넨 스커트"], "outer": [], "shoes": ["로퍼", "스트랩 샌들"], "acc": ["심플 펜던트", "토트"]},
-                "선선": {"top": ["파인 니트", "니트 폴로"], "bottom": ["슬랙스", "플리츠"], "outer": ["트렌치", "울 자켓"], "shoes": ["로퍼", "메리제인"], "acc": ["실크 스카프", "숄더백"]},
-                "추움": {"top": ["캐시미어 터틀넥", "울 니트"], "bottom": ["울 슬랙스", "니트 스커트"], "outer": ["핸드메이드 코트", "롱 다운"], "shoes": ["앵클 부츠", "로퍼"], "acc": ["머플러", "가죽 장갑"]}
-            },
-            "30대": {
-                "더움": {"top": ["리넨 셔츠", "니트 탑"], "bottom": ["세미와이드"], "outer": [], "shoes": ["로퍼"], "acc": ["워치"]},
-                "선선": {"top": ["파인 니트"], "bottom": ["슬랙스"], "outer": ["트렌치"], "shoes": ["로퍼", "메리제인"], "acc": ["스카프"]},
-                "추움": {"top": ["터틀넥"], "bottom": ["울 슬랙스"], "outer": ["울 코트"], "shoes": ["부츠"], "acc": ["머플러"]}
-            },
-            "40대이상": {
-                "더움": {"top": ["실크 블라우스"], "bottom": ["린넨 스커트"], "outer": [], "shoes": ["미들힐"], "acc": ["토트"]},
-                "선선": {"top": ["캐시미어 니트"], "bottom": ["슬랙스"], "outer": ["버진울 코트"], "shoes": ["로퍼"], "acc": ["실크 스카프"]},
-                "추움": {"top": ["캐시미어 터틀넥"], "bottom": ["울 슬랙스"], "outer": ["핸드메이드 코트"], "shoes": ["부츠"], "acc": ["장갑"]}
-            }
-        }
-    }
-}
-
-# ----------------- 로직 -----------------
-
-def age_group(age: int) -> str:
+# -----------------------------
+# 유틸
+# -----------------------------
+def get_age_group(age: int) -> str:
     if age < 20:
         return "10대"
     elif age < 30:
@@ -415,105 +38,356 @@ def age_group(age: int) -> str:
     elif age < 40:
         return "30대"
     else:
-        return "40대이상"
+        return "40대 이상"
 
-def weather_bucket(temp: float) -> str:
-    # 더움: 25도 이상 / 선선: 15~24.9 / 추움: 15도 미만
-    if temp >= 25:
+def get_weather_group(temp_c: float) -> str:
+    if temp_c >= 25:
         return "더움"
-    elif temp >= 15:
+    elif temp_c >= 15:
         return "선선"
-    return "추움"
+    else:
+        return "추움"
 
-def pick(lst):
-    return random.choice(lst) if lst else None
+def fetch_weather(city_kor: str):
+    """OpenWeather에서 현재 기온/날씨(한글)를 받아온다."""
+    city_eng = KOR2ENG.get(city_kor)
+    if not city_eng:
+        return None, None, None  # 매핑 실패
+    if not API_KEY:
+        return None, None, None  # API 키 없음
+    url = f"https://api.openweathermap.org/data/2.5/weather?q={city_eng}&appid={API_KEY}&units=metric&lang=kr"
+    try:
+        r = requests.get(url, timeout=8)
+        data = r.json()
+        if r.status_code == 200 and "main" in data and "weather" in data:
+            temp = float(data["main"]["temp"])
+            desc = data["weather"][0]["description"]
+            return city_kor, temp, desc
+        return None, None, None
+    except Exception:
+        return None, None, None
 
-def build_recommendation(character: str, gender: str, age: int, temp: float) -> str:
-    a = age_group(age)
-    w = weather_bucket(temp)
-    lib = OUTFITS.get(character, {}).get(gender, {}).get(a, {}).get(w)
-    if not lib:
-        return "코디 데이터를 찾지 못했습니다."
+# -----------------------------
+# 베이스 코디: 캐릭터 × 날씨 × 성별
+# (나이/체형/피부톤은 아래에서 가공)
+# -----------------------------
+BASE_OUTFITS = {
+    "trendy": {
+        "더움": {
+            "male":   {"상의": "오버핏 반팔 티셔츠", "하의": "와이드 데님", "신발": "캔버스 스니커즈", "액세서리": "버킷햇"},
+            "female": {"상의": "크롭 티셔츠",       "하의": "하이웨스트 데님 쇼츠", "신발": "스트랩 샌들", "액세서리": "크로스백"},
+        },
+        "선선": {
+            "male":   {"상의": "오버셔츠", "하의": "카고 팬츠", "신발": "로우탑 스니커즈", "액세서리": "캡"},
+            "female": {"상의": "카라 가디건", "하의": "플리츠 스커트", "신발": "스니커즈", "액세서리": "토트백"},
+        },
+        "추움": {
+            "male":   {"상의": "플리스 후디", "하의": "조거 팬츠", "신발": "하이탑 스니커즈", "액세서리": "비니"},
+            "female": {"상의": "숏 패딩", "하의": "스트레이트 데님", "신발": "앵클 부츠", "액세서리": "버킷백"},
+        },
+    },
+    "gentle": {
+        "더움": {
+            "male":   {"상의": "린넨 셔츠", "하의": "테이퍼드 치노", "신발": "로퍼", "액세서리": "가죽 벨트"},
+            "female": {"상의": "린넨 블라우스", "하의": "미디 스커트", "신발": "플랫 슈즈", "액세서리": "가죽 벨트"},
+        },
+        "선선": {
+            "male":   {"상의": "니트 폴로", "하의": "슬랙스", "신발": "더비 슈즈", "액세서리": "메탈 워치"},
+            "female": {"상의": "크롭 가디건", "하의": "슬랙스", "신발": "로퍼", "액세서리": "실버 네클리스"},
+        },
+        "추움": {
+            "male":   {"상의": "울 코트 + 터틀넥", "하의": "울 슬랙스", "신발": "첼시 부츠", "액세서리": "레더 글러브"},
+            "female": {"상의": "핸드메이드 코트", "하의": "니트 원피스", "신발": "롱 부츠", "액세서리": "레더 토트"},
+        },
+    },
+    "cute": {
+        "더움": {
+            "male":   {"상의": "파스텔 티셔츠", "하의": "스트레이트 데님", "신발": "화이트 스니커즈", "액세서리": "캔버스 백"},
+            "female": {"상의": "퍼프 블라우스", "하의": "A라인 스커트", "신발": "메리제인", "액세서리": "헤어핀"},
+        },
+        "선선": {
+            "male":   {"상의": "라이트 가디건", "하의": "크롭트 치노", "신발": "스니커즈", "액세서리": "비니"},
+            "female": {"상의": "리본 블라우스", "하의": "플리츠 스커트", "신발": "플랫 슈즈", "액세서리": "리본 헤어밴드"},
+        },
+        "추움": {
+            "male":   {"상의": "더플 코트 + 니트", "하의": "면 팬츠", "신발": "스니커즈", "액세서리": "머플러"},
+            "female": {"상의": "더플 코트 + 케이블 니트", "하의": "미니 스커트", "신발": "롱 부츠", "액세서리": "머플러"},
+        },
+    },
+    "practical": {
+        "더움": {
+            "male":   {"상의": "기능성 티셔츠", "하의": "카고 쇼츠", "신발": "트레일 러너", "액세서리": "캡"},
+            "female": {"상의": "드라이 티셔츠", "하의": "테크 쇼츠", "신발": "워킹 슈즈", "액세서리": "캡"},
+        },
+        "선선": {
+            "male":   {"상의": "바람막이", "하의": "기능성 팬츠", "신발": "워킹 슈즈", "액세서리": "크로스백"},
+            "female": {"상의": "라이트 재킷", "하의": "조거 팬츠", "신발": "스니커즈", "액세서리": "백팩"},
+        },
+        "추움": {
+            "male":   {"상의": "소프트쉘 재킷", "하의": "기모 조거", "신발": "고어텍스 부츠", "액세서리": "니트 비니"},
+            "female": {"상의": "패딩 재킷", "하의": "기모 레깅스", "신발": "워킹 부츠", "액세서리": "니트 비니"},
+        },
+    },
+    "luxury": {
+        "더움": {
+            "male":   {"상의": "실크 셔츠", "하의": "플리츠 슬랙스", "신발": "로퍼", "액세서리": "가죽 카드지갑"},
+            "female": {"상의": "실크 블라우스", "하의": "크림 슬랙스", "신발": "뮬", "액세서리": "미니 가죽 백"},
+        },
+        "선선": {
+            "male":   {"상의": "캐시미어 가디건", "하의": "울 슬랙스", "신발": "더비 슈즈", "액세서리": "레더 벨트"},
+            "female": {"상의": "트위드 자켓", "하의": "플레어 스커트", "신발": "펌프스", "액세서리": "진주 귀걸이"},
+        },
+        "추움": {
+            "male":   {"상의": "체스터필드 코트 + 캐시미어 터틀넥", "하의": "플란넬 슬랙스", "신발": "첼시 부츠", "액세서리": "레더 글러브"},
+            "female": {"상의": "롱 코트 + 실크 블라우스", "하의": "와이드 슬랙스", "신발": "첼시 부츠", "액세서리": "레더 글러브"},
+        },
+    },
+}
 
-    top = pick(lib["top"])
-    bottom = pick(lib["bottom"])
-    outer = pick(lib["outer"])
-    shoes = pick(lib["shoes"])
-    acc = pick(lib["acc"])
+# -----------------------------
+# 피부톤 팔레트 (캐릭터별 추천 색)
+# -----------------------------
+PALETTES = {
+    "trendy": {
+        "웜톤": {"상의": "베이지", "하의": "카키", "신발": "화이트", "액세서리": "골드"},
+        "쿨톤": {"상의": "네이비", "하의": "그레이", "신발": "블랙", "액세서리": "실버"},
+    },
+    "gentle": {
+        "웜톤": {"상의": "아이보리", "하의": "카멜", "신발": "브라운", "액세서리": "골드"},
+        "쿨톤": {"상의": "라이트 블루", "하의": "차콜", "신발": "블랙", "액세서리": "실버"},
+    },
+    "cute": {
+        "웜톤": {"상의": "코랄", "하의": "크림", "신발": "화이트", "액세서리": "골드"},
+        "쿨톤": {"상의": "라벤더", "하의": "아이보리", "신발": "화이트", "액세서리": "실버"},
+    },
+    "practical": {
+        "웜톤": {"상의": "올리브", "하의": "샌드", "신발": "브라운", "액세서리": "카키"},
+        "쿨톤": {"상의": "스카이블루", "하의": "그레이", "신발": "블랙", "액세서리": "네이비"},
+    },
+    "luxury": {
+        "웜톤": {"상의": "카멜", "하의": "초콜릿", "신발": "버건디", "액세서리": "골드"},
+        "쿨톤": {"상의": "차콜", "하의": "네이비", "신발": "블랙", "액세서리": "실버"},
+    },
+}
 
-    parts = [f"상의: {top}", f"하의: {bottom}"]
-    if outer: parts.append(f"아우터: {outer}")
-    parts.append(f"신발: {shoes}")
-    if acc: parts.append(f"액세서리: {acc}")
+# -----------------------------
+# 가공 함수
+# -----------------------------
+def deep_copy_items(items: dict) -> dict:
+    return {k: v for k, v in items.items()}
 
-    return f"{a} {gender} · {w} 컨셉 ({CHARACTERS[character]}): " + ", ".join(parts)
+def tune_by_age(character: str, gender: str, age_group: str, items: dict) -> dict:
+    """나이대에 따라 살짝 톤앤매너를 조정 (캐릭터 성격 유지)."""
+    it = deep_copy_items(items)
 
-def get_weather(city_kor: str):
-    eng = K2E.get(city_kor)
-    if not eng or not API_KEY:
-        return None
-    url = f"http://api.openweathermap.org/data/2.5/weather?q={eng}&appid={API_KEY}&units=metric&lang=kr"
-    r = requests.get(url, timeout=10)
-    if r.status_code != 200:
-        return None
-    j = r.json()
-    return {"temp": float(j["main"]["temp"]), "desc": j["weather"][0]["description"]}
+    if age_group == "10대":
+        if character in ["gentle", "luxury"]:
+            # 포멀도를 살짝 낮춤
+            if gender == "male":
+                it["신발"] = "화이트 스니커즈"
+            else:
+                it["신발"] = "플랫 슈즈"
+        if character == "trendy" and "슬랙스" in it["하의"]:
+            it["하의"] = "와이드 데님"
 
-# ----------------- 라우팅 -----------------
+    elif age_group == "30대":
+        if character == "trendy" and "와이드 데님" in it["하의"]:
+            it["하의"] = "세미와이드 슬랙스"
+        if character == "cute" and "미니 스커트" in it["하의"]:
+            it["하의"] = "A라인 미디 스커트"
 
+    elif age_group == "40대 이상":
+        # 전체적으로 실루엣 정돈
+        if "오버핏" in it["상의"]:
+            it["상의"] = it["상의"].replace("오버핏", "세미오버핏")
+        if "와이드" in it["하의"]:
+            it["하의"] = it["하의"].replace("와이드", "세미와이드")
+        if character in ["trendy", "cute"]:
+            it["신발"] = "레더 로퍼" if gender == "male" else "로우 힐"
+
+    return it
+
+def adjust_by_body_shape(items: dict, body_shape: str, gender: str) -> dict:
+    """체형별로 핏/실루엣 보정."""
+    it = deep_copy_items(items)
+    b = body_shape.strip()
+
+    def prefix_fit(text, fit_word):
+        # 이미 존재하면 중복 방지
+        return text if text.startswith(fit_word) else f"{fit_word} {text}"
+
+    if b == "마른":
+        it["상의"] = prefix_fit(it["상의"], "오버핏")
+        if "슬랙스" in it["하의"]:
+            it["하의"] = it["하의"].replace("슬랙스", "스트레이트 슬랙스")
+        elif "데님" in it["하의"]:
+            it["하의"] = it["하의"].replace("데님", "스트레이트 데님")
+
+    elif b == "통통":
+        it["상의"] = prefix_fit(it["상의"], "세미오버핏")
+        # 하의는 테이퍼드/다크 톤 지향
+        if "와이드" in it["하의"]:
+            it["하의"] = it["하의"].replace("와이드", "테이퍼드")
+        if "데님" in it["하의"] and "다크" not in it["하의"]:
+            it["하의"] = "다크 데님" if gender == "male" else "다크 스트레이트 데님"
+
+    elif b == "역삼각형":
+        # 상체는 정돈, 하체에 볼륨
+        it["상의"] = prefix_fit(it["상의"], "레귤러핏")
+        if "슬랙스" in it["하의"] and "와이드" not in it["하의"]:
+            it["하의"] = it["하의"].replace("슬랙스", "와이드 슬랙스")
+        if "스커트" in it["하의"] and "플리츠" not in it["하의"]:
+            it["하의"] = "플리츠 스커트"
+
+    # 보통: 변화 없음
+    return it
+
+def colorize_by_skin_tone(character: str, skin_tone: str, items: dict) -> dict:
+    """피부톤에 따라 카테고리별 대표 색을 붙여 최종 아이템 문구를 만든다."""
+    palette = PALETTES.get(character, {}).get(skin_tone, {})
+    it = deep_copy_items(items)
+    for cat in ["상의", "하의", "신발", "액세서리"]:
+        color = palette.get(cat)
+        if color:
+            it[cat] = f"{color} {it[cat]}"
+    return it
+
+def build_final_text(city, temp_c, desc, age_group, gender, weather_group, character, skin_tone, body_shape, items):
+    """요청한 최종 출력 포맷으로 문자열 생성."""
+    gender_ko = GENDER_KO.get(gender, "")
+    concept = CHAR_LABEL_KO.get(character, character)
+    header = f"{city} · {temp_c:.1f}°C · '{desc}'\n{age_group} {gender_ko} · {weather_group} · 컨셉 ({concept}) · {skin_tone} · 체형: {body_shape}"
+    detail = f"\n\n상의: {items['상의']}\n하의: {items['하의']}\n신발: {items['신발']}\n액세서리: {items['액세서리']}"
+    return header + detail
+
+# -----------------------------
+# 라우팅 (대화 흐름)
+# -----------------------------
 @app.route("/")
 def select_character():
-    return render_template("chat_select.html", characters=CHARACTERS)
+    return render_template("chat_select.html")
 
-@app.route("/start_chat", methods=["POST"])
+@app.route("/start", methods=["POST"])
 def start_chat():
+    character = request.form.get("character")
     session.clear()
-    session["character"] = request.form.get("character")
-    session["step"] = "ask_city"
-    return render_template("chat.html", character=CHARACTERS[session["character"]])
+    session["character"] = character
+    session["step"] = "gender"
+    session["messages"] = [
+        {"sender": "bot", "text": f"{CHAR_LABEL_KO.get(character, character)}를 선택하셨어요. 성별을 입력해주세요 (남/여)."}
+    ]
+    return render_template("chat.html", messages=session["messages"])
 
 @app.route("/chat", methods=["POST"])
 def chat():
-    msg = request.json.get("message", "").strip()
-    step = session.get("step", "ask_city")
+    user_msg = request.form.get("message", "").strip()
+    step = session.get("step")
+    character = session.get("character")
+    messages = session.get("messages", [])
+    if user_msg:
+        messages.append({"sender": "user", "text": user_msg})
 
-    if step == "ask_city":
-        info = get_weather(msg)
-        if not info:
-            return jsonify({"reply": "지원하지 않는 지역이거나 날씨 조회 실패입니다. 예: 서울/부산/제주"})
-        session["city"] = msg
-        session["temp"] = info["temp"]
-        session["desc"] = info["desc"]
-        session["step"] = "ask_gender"
-        return jsonify({"reply": f"{msg}의 현재 {info['temp']}°C, 날씨 '{info['desc']}'입니다. 성별을 입력해주세요 (남성/여성)."})
+    # 1) 성별
+    if step == "gender":
+        if "남" in user_msg:
+            session["gender"] = "male"
+        elif "여" in user_msg:
+            session["gender"] = "female"
+        else:
+            bot = "성별은 '남' 또는 '여'로 입력해주세요."
+            messages.append({"sender": "bot", "text": bot})
+            session["messages"] = messages
+            return jsonify({"messages": messages})
 
-    if step == "ask_gender":
-        if msg not in ["남성", "여성"]:
-            return jsonify({"reply": "성별은 '남성' 또는 '여성'으로 입력해주세요."})
-        session["gender"] = msg
-        session["step"] = "ask_age"
-        return jsonify({"reply": "나이를 숫자로 입력해주세요."})
+        session["step"] = "age"
+        bot = "나이를 숫자로 입력해주세요."
+        messages.append({"sender": "bot", "text": bot})
 
-    if step == "ask_age":
-        if not msg.isdigit():
-            return jsonify({"reply": "나이는 숫자로 입력해주세요."})
-        session["age"] = int(msg)
+    # 2) 나이
+    elif step == "age":
+        try:
+            age = int(user_msg)
+            if age <= 0 or age > 120:
+                raise ValueError()
+            session["age"] = age
+            session["step"] = "city"
+            bot = "지역을 입력해주세요 (예: 서울, 부산, 대구, 인천, 광주, 대전, 울산, 세종, 수원, 전주, 제주)"
+        except ValueError:
+            bot = "나이는 숫자로 입력해주세요 (예: 22)."
+        messages.append({"sender": "bot", "text": bot})
 
-        character = session["character"]
+    # 3) 지역
+    elif step == "city":
+        city = user_msg.replace(" ", "")
+        session["city"] = city
+        # 여기서는 우선 도시만 저장하고 다음 단계로 진행 (실제 조회는 최종 단계에서)
+        session["step"] = "body_shape"
+        bot = "당신의 체형을 알려주세요\n예시) 마른, 보통, 통통, 역삼각형"
+        messages.append({"sender": "bot", "text": bot})
+
+    # 4) 체형
+    elif step == "body_shape":
+        session["body_shape"] = user_msg
+        session["step"] = "skin_tone"
+        bot = "당신의 피부 톤을 알려주세요\n예시) 웜톤, 쿨톤"
+        messages.append({"sender": "bot", "text": bot})
+
+    # 5) 피부톤 -> 최종 추천
+    elif step == "skin_tone":
+        session["skin_tone"] = user_msg
+        # 날씨 조회
+        city, temp, desc = fetch_weather(session.get("city", ""))
+        if not city:
+            bot = "날씨 정보를 불러오지 못했어요. 지원 도시명과 API 키를 확인하고 다시 '지역'부터 입력해 주세요."
+            session["step"] = "city"
+            messages.append({"sender": "bot", "text": bot})
+            session["messages"] = messages
+            return jsonify({"messages": messages})
+
+        # 그룹 계산
+        age_group = get_age_group(int(session["age"]))
+        weather_group = get_weather_group(temp)
         gender = session["gender"]
-        temp = session["temp"]
-        city = session["city"]
-        desc = session["desc"]
+        skin_tone = session["skin_tone"]
+        body_shape = session["body_shape"]
 
-        rec = build_recommendation(character, gender, session["age"], temp)
+        # 베이스 아이템
+        base = BASE_OUTFITS.get(character, {}).get(weather_group, {}).get(gender, {})
+        if not base:
+            bot = "해당 조건의 코디 데이터가 부족해요. 다른 캐릭터나 조건으로 시도해 보세요."
+            session["step"] = "done"
+            messages.append({"sender": "bot", "text": bot})
+            session["messages"] = messages
+            return jsonify({"messages": messages})
+
+        # 가공: 나이 → 체형 → 피부톤
+        items = tune_by_age(character, gender, age_group, base)
+        items = adjust_by_body_shape(items, body_shape, gender)
+        items = colorize_by_skin_tone(character, skin_tone, items)
+
+        # 최종 텍스트
+        final_text = build_final_text(
+            city=city, temp_c=temp, desc=desc,
+            age_group=age_group, gender=gender,
+            weather_group=weather_group, character=character,
+            skin_tone=skin_tone, body_shape=body_shape,
+            items=items
+        )
+        bot = final_text
         session["step"] = "done"
-        return jsonify({"reply": f"{city} · {temp}°C · '{desc}'\n{rec}"})
+        messages.append({"sender": "bot", "text": bot})
 
-    if step == "done":
-        return jsonify({"reply": "대화를 다시 시작하려면 새로고침 해주세요."})
+    else:
+        bot = "대화를 다시 시작하려면 새로고침(F5) 하세요."
+        messages.append({"sender": "bot", "text": bot})
 
-    return jsonify({"reply": "오류가 발생했습니다. 새로고침 후 다시 시도해주세요."})
+    session["messages"] = messages
+    return jsonify({"messages": messages})
 
+# -----------------------------
+# Render 실행용
+# -----------------------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
