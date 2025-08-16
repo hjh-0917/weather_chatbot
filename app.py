@@ -1,75 +1,64 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 import json
 import os
 
 app = Flask(__name__)
+app.secret_key = "your_secret_key_here"
 
-# JSON 파일 루트 경로
-JSON_ROOT = "json"
+# 1️⃣ 스타일별 캐릭터 딕셔너리
+CHARACTERS = {
+    "trendy": "트렌디",
+    "practical": "프랙티컬",
+    "luxury": "럭셔리",
+    "gentle": "젠틀",
+    "cute": "큐트"
+}
 
-# 선택 가능한 옵션들
-AGES = ["10대", "20대", "30대"]
-GENDERS = ["male", "female"]
-STYLES = ["trendy", "practical", "luxury", "gentle", "cute"]
-WEATHERS = ["더움", "선선", "추움"]
-TONES = ["웜톤", "쿨톤"]
-BODIES = ["마른", "보통", "통통", "역삼각형"]
+# 2️⃣ JSON 파일 기본 경로
+BASE_PATH = "JSON"  # JSON/teen_male/trendy.json 등
 
-def load_outfit(age, gender, style):
-    """해당 age/gender/style 경로의 JSON 파일 불러오기"""
-    filepath = os.path.join(JSON_ROOT, f"{age}_{gender}", f"{style}.json")
-    if not os.path.exists(filepath):
-        return None
-    with open(filepath, "r", encoding="utf-8") as f:
-        return json.load(f)
+def load_codi_data(age_group, gender, style):
+    """
+    연령대, 성별, 스타일에 맞는 JSON 데이터를 불러옵니다.
+    """
+    file_path = os.path.join(BASE_PATH, f"{age_group}_{gender}", f"{style}.json")
+    if not os.path.exists(file_path):
+        return {}
+    with open(file_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    return data
 
-def get_outfit(data, weather, tone, body):
-    """JSON 데이터에서 날씨, 피부톤, 체형에 맞는 코디 반환"""
-    try:
-        # JSON 내부 구조 탐색
-        style_key = list(data.keys())[0]
-        age_gender_data = data[style_key]
-        # 성별/연령대는 이미 JSON 파일 이름으로 구분되어 있으므로 data 안에 들어있지 않을 수 있음
-        outfit = age_gender_data
-        if weather in outfit:
-            outfit = outfit[weather]
-        if tone in outfit:
-            outfit = outfit[tone]
-        if body in outfit:
-            return outfit[body]
-        return None
-    except Exception as e:
-        return None
-
-@app.route("/", methods=["GET", "POST"])
+# 3️⃣ 캐릭터 선택 화면
+@app.route("/")
 def index():
-    if request.method == "POST":
-        age = request.form.get("age")
-        gender = request.form.get("gender")
-        style = request.form.get("style")
-        weather = request.form.get("weather")
-        tone = request.form.get("tone")
-        body = request.form.get("body")
+    return render_template("chat_select.html", characters=CHARACTERS)
 
-        data = load_outfit(age, gender, style)
-        if not data:
-            return "해당 코디 데이터가 없습니다."
+# 4️⃣ 캐릭터 선택 후 챗 화면으로 이동
+@app.route("/start_chat", methods=["POST"])
+def start_chat():
+    style = request.form.get("character")  # chat_select.html에서 hidden input name="character"
+    if style not in CHARACTERS:
+        style = "trendy"  # 기본값
+    session["style"] = style
+    return redirect(url_for("chat"))
 
-        outfit = get_outfit(data, weather, tone, body)
-        if not outfit:
-            return "선택한 조건에 맞는 코디가 없습니다."
+# 5️⃣ 챗 화면
+@app.route("/chat")
+def chat():
+    style = session.get("style", "trendy")
+    return render_template("chat.html", character=CHARACTERS.get(style, "트렌디"))
 
-        return render_template("chat.html", outfit=outfit)
-
-    return render_template(
-        "chat_select.html",
-        ages=AGES,
-        genders=GENDERS,
-        styles=STYLES,
-        weathers=WEATHERS,
-        tones=TONES,
-        bodies=BODIES
-    )
+# 6️⃣ 챗 메시지 처리
+@app.route("/chat", methods=["POST"])
+def chat_post():
+    user_message = request.json.get("message")
+    style = session.get("style", "trendy")
+    
+    # ⚠️ 실제 코디 추천 로직: JSON 데이터 불러와 연령대, 성별, 체형, 톤 등 활용 가능
+    # 현재 예시는 단순 메시지 응답
+    reply = f"{CHARACTERS.get(style)} 스타일 챗봇이 답변합니다: '{user_message}'"
+    
+    return jsonify({"reply": reply})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
