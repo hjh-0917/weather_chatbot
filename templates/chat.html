@@ -1,99 +1,50 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <title>{{ character }} 챗봇</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', sans-serif;
-            background-color: #fafafa;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
-        .chat-box {
-            display: flex;
-            flex-direction: column;
-            width: 100%;
-            max-width: 600px;
-            height: 80vh;
-            background: white;
-            border-radius: 10px;
-            padding: 15px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-        .messages {
-            flex: 1;
-            overflow-y: auto;
-            margin-bottom: 10px;
-        }
-        .message {
-            margin: 8px 0;
-        }
-        .bot {
-            color: #333;
-        }
-        .user {
-            color: #007BFF;
-            text-align: right;
-        }
-        .input-area {
-            display: flex;
-        }
-        .input-area input {
-            flex: 1;
-            padding: 8px;
-            border-radius: 8px;
-            border: 1px solid #ccc;
-        }
-        .input-area button {
-            margin-left: 8px;
-            padding: 8px 15px;
-            border: none;
-            border-radius: 8px;
-            background: #4CAF50;
-            color: white;
-            cursor: pointer;
-        }
-        .input-area button:hover {
-            background: #45a049;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>옷 코디 챗봇</title>
+  <style>
+    body { font-family: sans-serif; }
+    #chat-box { width: 90%; height: 400px; border: 1px solid #ccc; overflow-y: scroll; margin: 20px auto; padding: 10px; }
+    #user-input { width: 80%; padding: 10px; }
+    button { padding: 10px; }
+  </style>
 </head>
 <body>
-    <div class="chat-box">
-        <div class="messages" id="chat-box">
-            <div class="message bot">안녕하세요! 먼저 지역을 입력해주세요.</div>
-        </div>
-        <div class="input-area">
-            <input type="text" id="user-input" placeholder="메시지를 입력하세요">
-            <button onclick="sendMessage()">전송</button>
-        </div>
-    </div>
+  <h2>{{ character }} 챗봇과 대화</h2>
+  <div id="chat-box"></div>
+  <div style="text-align: center;">
+    <form id="chat-form">
+      <input type="text" id="user-input" placeholder="메시지를 입력하세요" required>
+      <button type="submit">보내기</button>
+    </form>
+  </div>
+  <script>
+    const form = document.getElementById("chat-form");
+    const input = document.getElementById("user-input");
+    const chatBox = document.getElementById("chat-box");
 
-    <script>
-        function sendMessage() {
-            const input = document.getElementById("user-input");
-            const msg = input.value.trim();
-            if (!msg) return;
+    function addMessage(sender, text) {
+      const div = document.createElement("div");
+      div.textContent = sender + ": " + text;
+      chatBox.appendChild(div);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
 
-            const chatBox = document.getElementById("chat-box");
-            chatBox.innerHTML += `<div class="message user">${msg}</div>`;
-
-            fetch("/chat", {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({message: msg})
-            })
-            .then(res => res.json())
-            .then(data => {
-                chatBox.innerHTML += `<div class="message bot">${data.reply.replace(/\n/g, "<br>")}</div>`;
-                chatBox.scrollTop = chatBox.scrollHeight;
-            });
-
-            input.value = "";
-        }
-    </script>
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const msg = input.value;
+      addMessage("You", msg);
+      input.value = "";
+      const res = await fetch("/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: "message=" + encodeURIComponent(msg)
+      });
+      const text = await res.text();
+      addMessage("Bot", text);
+    }
+  </script>
 </body>
 </html>
+
