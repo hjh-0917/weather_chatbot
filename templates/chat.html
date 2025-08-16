@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>{{ character }}</title>
+    <title>{{ character }} 챗봇</title>
     <style>
         body {
             font-family: 'Segoe UI', sans-serif;
@@ -88,7 +88,7 @@
             })
             .then(res => res.json())
             .then(data => {
-                chatBox.innerHTML += `<div class="message bot">${data.reply}</div>`;
+                chatBox.innerHTML += `<div class="message bot">${data.reply.replace(/\n/g, "<br>")}</div>`;
                 chatBox.scrollTop = chatBox.scrollHeight;
             });
 
