@@ -5,66 +5,65 @@
     <title>캐릭터 선택</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            background: #f2f2f2;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #f4f4f4;
+            text-align: center;
+            padding: 20px;
         }
-        .container {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-            background: white;
-            padding: 30px;
-            border-radius: 15px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        h1 {
+            margin-bottom: 30px;
+        }
+        .character-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 30px;
         }
         .character-card {
-            text-align: center;
-            cursor: pointer;
-            border: 2px solid transparent;
-            border-radius: 10px;
-            transition: 0.2s;
-            padding: 10px;
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            width: 150px;
+            transition: transform 0.2s ease-in-out;
         }
         .character-card:hover {
-            border: 2px solid #007bff;
             transform: scale(1.05);
         }
-        .character-card img {
-            width: 120px;
-            height: 120px;
-            border-radius: 50%;
+        .character-img {
+            width: 80px;
+            height: 80px;
             object-fit: cover;
+            border-radius: 50%;
+            border: 2px solid #ccc;
+            margin-bottom: 10px;
         }
-        .character-card p {
-            margin-top: 10px;
-            font-size: 16px;
-            font-weight: bold;
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
         }
     </style>
 </head>
 <body>
-    <form method="POST" action="/start" id="characterForm">
-        <div class="container">
-            {% for key, name in characters.items() %}
-                <div class="character-card" onclick="selectCharacter('{{ key }}')">
-                    <img src="{{ url_for('static', filename=images[key]) }}" alt="{{ name }}">
-                    <p>{{ name }}</p>
-                </div>
-            {% endfor %}
+    <h1>패션 코디 챗봇 캐릭터 선택</h1>
+    <div class="character-container">
+        {% for key, name in characters.items() %}
+        <div class="character-card">
+            <img src="{{ url_for('static', filename='images/' + key + '.png') }}" alt="{{ name }}" class="character-img">
+            <p>{{ name }}</p>
+            <form action="/start_chat" method="post">
+                <input type="hidden" name="character" value="{{ key }}">
+                <button type="submit">선택</button>
+            </form>
         </div>
-        <input type="hidden" name="character" id="selectedCharacter">
-    </form>
-
-    <script>
-        function selectCharacter(character) {
-            document.getElementById("selectedCharacter").value = character;
-            document.getElementById("characterForm").submit();
-        }
-    </script>
+        {% endfor %}
+    </div>
 </body>
 </html>

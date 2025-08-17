@@ -2,125 +2,98 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>코디 챗봇</title>
+    <title>{{ character }}</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            background: #f2f2f2;
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #fafafa;
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
-            margin: 0;
-        }
-        .chat-container {
-            width: 400px;
-            height: 600px;
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
         }
         .chat-box {
-            flex: 1;
-            padding: 15px;
-            overflow-y: auto;
-        }
-        .chat-message {
-            margin: 5px 0;
-            padding: 8px 12px;
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            max-width: 600px;
+            height: 80vh;
+            background: white;
             border-radius: 10px;
-            max-width: 80%;
+            padding: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
-        .user {
-            background: #007bff;
-            color: white;
-            align-self: flex-end;
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            margin-bottom: 10px;
+        }
+        .message {
+            margin: 8px 0;
         }
         .bot {
-            background: #e5e5ea;
-            color: black;
-            align-self: flex-start;
+            color: #333;
+        }
+        .user {
+            color: #007BFF;
+            text-align: right;
         }
         .input-area {
             display: flex;
-            border-top: 1px solid #ccc;
         }
         .input-area input {
             flex: 1;
-            padding: 10px;
-            border: none;
-            outline: none;
+            padding: 8px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
         }
         .input-area button {
-            padding: 10px;
+            margin-left: 8px;
+            padding: 8px 15px;
             border: none;
-            background: #007bff;
+            border-radius: 8px;
+            background: #4CAF50;
             color: white;
             cursor: pointer;
         }
         .input-area button:hover {
-            background: #0056b3;
+            background: #45a049;
         }
     </style>
 </head>
 <body>
-    <div class="chat-container">
-        <div class="chat-box" id="chat-box"></div>
+    <div class="chat-box">
+        <div class="messages" id="chat-box">
+            <div class="message bot">안녕하세요! 먼저 지역을 입력해주세요.</div>
+        </div>
         <div class="input-area">
-            <input type="text" id="message" placeholder="메시지를 입력하세요..." />
+            <input type="text" id="user-input" placeholder="메시지를 입력하세요">
             <button onclick="sendMessage()">전송</button>
         </div>
     </div>
 
     <script>
-        // 챗봇 첫 메시지 출력
-        window.onload = function() {
-            fetch("/start", {
-                method: "POST",
-                body: new URLSearchParams({"character": "{{ character }}"})
-            })
-            .then(response => response.text())
-            .then(data => {
-                addMessage("bot", data);
-            });
-        };
-
-        function addMessage(sender, text) {
-            const chatBox = document.getElementById("chat-box");
-            const msg = document.createElement("div");
-            msg.className = "chat-message " + sender;
-            msg.innerText = text;
-            chatBox.appendChild(msg);
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
-
         function sendMessage() {
-            const input = document.getElementById("message");
-            const text = input.value.trim();
-            if (!text) return;
-            addMessage("user", text);
-            input.value = "";
+            const input = document.getElementById("user-input");
+            const msg = input.value.trim();
+            if (!msg) return;
+
+            const chatBox = document.getElementById("chat-box");
+            chatBox.innerHTML += `<div class="message user">${msg}</div>`;
 
             fetch("/chat", {
                 method: "POST",
-                headers: {"Content-Type": "application/x-www-form-urlencoded"},
-                body: "message=" + encodeURIComponent(text)
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({message: msg})
             })
-            .then(response => response.text())
+            .then(res => res.json())
             .then(data => {
-                addMessage("bot", data);
+                chatBox.innerHTML += `<div class="message bot">${data.reply}</div>`;
+                chatBox.scrollTop = chatBox.scrollHeight;
             });
-        }
 
-        // 엔터키 입력 처리
-        document.getElementById("message").addEventListener("keypress", function(e) {
-            if (e.key === "Enter") {
-                sendMessage();
-            }
-        });
+            input.value = "";
+        }
     </script>
 </body>
 </html>
