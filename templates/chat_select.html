@@ -1,27 +1,70 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-  <title>캐릭터 선택</title>
-  <style>
-    body { font-family: sans-serif; text-align: center; margin: 50px; }
-    .character { display: inline-block; margin: 20px; }
-    .character img { width: 120px; height: 120px; border-radius: 50%; }
-    button { display: block; margin: 10px auto; padding: 10px 20px; }
-  </style>
+    <meta charset="UTF-8">
+    <title>캐릭터 선택</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f2f2f2;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+        .character-card {
+            text-align: center;
+            cursor: pointer;
+            border: 2px solid transparent;
+            border-radius: 10px;
+            transition: 0.2s;
+            padding: 10px;
+        }
+        .character-card:hover {
+            border: 2px solid #007bff;
+            transform: scale(1.05);
+        }
+        .character-card img {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+        .character-card p {
+            margin-top: 10px;
+            font-size: 16px;
+            font-weight: bold;
+        }
+    </style>
 </head>
 <body>
-  <h2>캐릭터를 선택하세요</h2>
-  {% for key, name in characters.items() %}
-    <div class="character">
-      <img src="{{ url_for('static', filename=images[key]) }}" alt="{{ name }}">
-      <form action="/start" method="POST">
-        <input type="hidden" name="character" value="{{ key }}">
-        <button type="submit">{{ name }}</button>
-      </form>
-    </div>
-  {% endfor %}
+    <form method="POST" action="/start" id="characterForm">
+        <div class="container">
+            {% for key, name in characters.items() %}
+                <div class="character-card" onclick="selectCharacter('{{ key }}')">
+                    <img src="{{ url_for('static', filename=images[key]) }}" alt="{{ name }}">
+                    <p>{{ name }}</p>
+                </div>
+            {% endfor %}
+        </div>
+        <input type="hidden" name="character" id="selectedCharacter">
+    </form>
+
+    <script>
+        function selectCharacter(character) {
+            document.getElementById("selectedCharacter").value = character;
+            document.getElementById("characterForm").submit();
+        }
+    </script>
 </body>
 </html>
-
-
