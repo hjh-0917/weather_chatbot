@@ -1,67 +1,96 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-  <title>챗봇 - {{ characters[character] }}</title>
+  <meta charset="utf-8">
+  <title>챗봇 대화</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    #chat-box {
-      border: 1px solid #ccc;
-      padding: 10px;
-      height: 400px;
-      overflow-y: scroll;
-      margin-bottom: 10px;
-    }
-    .message { margin: 5px 0; }
-    .user { color: blue; }
-    .bot { color: green; }
-    #chat-input { width: 70%; }
+    :root { --card:#fff; --bg:#f5f7fb; --line:#e6ebf2; }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background: var(--bg); margin:0; }
+    .wrap { max-width: 920px; margin: 28px auto; padding: 0 16px; }
+    .head { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+    .avatar { width:40px; height:40px; border-radius: 9999px; object-fit: cover; border:1px solid var(--line); }
+    .title { font-weight:700; font-size:18px; }
+    .card { background: var(--card); border-radius: 16px; box-shadow: 0 4px 14px rgba(0,0,0,0.07); display:flex; flex-direction:column; height: calc(100vh - 140px); }
+    .scroll { padding: 16px; overflow-y: auto; flex: 1 1 auto; }
+    .msg { margin: 10px 0; display:flex; }
+    .msg .bubble { padding: 10px 12px; border-radius: 12px; max-width: 78%; line-height: 1.45; white-space: pre-wrap; }
+    .me { justify-content: flex-end; }
+    .me .bubble { background:#dff1ff; }
+    .bot .bubble { background:#f1f3f7; }
+    .inputbar { border-top: 1px solid var(--line); padding: 12px; display:flex; gap:8px; }
+    .inputbar input { flex: 1 1 auto; padding: 12px 12px; border:1px solid var(--line); border-radius: 10px; font-size: 15px; }
+    .inputbar button { padding: 0 16px; border:none; border-radius:10px; background:#3867ff; color:#fff; font-weight:600; cursor:pointer; }
+    .inputbar button:disabled { opacity:.5; cursor:not-allowed; }
   </style>
 </head>
 <body>
-  <h2>{{ characters[character] }} 스타일 챗봇</h2>
-  <div id="chat-box"></div>
+  <div class="wrap">
+    <div class="head">
+      <img class="avatar" src="{{ url_for('static', filename='images/' + persona_image) }}" alt="{{ persona_label }}">
+      <div class="title">{{ persona_label }} 캐릭터</div>
+    </div>
 
-  <input id="chat-input" type="text" placeholder="메시지를 입력하세요...">
-  <button onclick="sendMessage()">전송</button>
-
-  <!-- 저장 버튼 -->
-  <button id="save-btn" style="margin-top:10px; display:none;">⭐ 코디 저장</button>
-
-  <a href="/saved">➡ 저장한 코디 보러가기</a>
+    <div class="card">
+      <div id="chat" class="scroll"></div>
+      <div class="inputbar">
+        <input id="msgInput" type="text" placeholder="메시지를 입력하세요…" autofocus>
+        <button id="sendBtn">전송</button>
+      </div>
+    </div>
+  </div>
 
   <script>
-    function sendMessage() {
-      const input = document.getElementById("chat-input");
-      const msg = input.value;
-      if (!msg) return;
-      const chatBox = document.getElementById("chat-box");
-      chatBox.innerHTML += `<div class="message user">나: ${msg}</div>`;
-      input.value = "";
+    const chat = document.getElementById('chat');
+    const input = document.getElementById('msgInput');
+    const btn = document.getElementById('sendBtn');
 
-      fetch("/chat", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({character: "{{ character }}", message: msg})
-      }).then(res => res.json()).then(data => {
-        chatBox.innerHTML += `<div class="message bot">봇: ${data.reply}</div>`;
-        chatBox.scrollTop = chatBox.scrollHeight;
-        document.getElementById("save-btn").style.display = "block";
-        window.latestOutfit = data.reply;
-      });
+    // 봇 메시지/내 메시지 출력
+    function addMsg(text, who="bot") {
+      const row = document.createElement('div');
+      row.className = `msg ${who}`;
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+      bubble.textContent = text;
+      row.appendChild(bubble);
+      chat.appendChild(row);
+      chat.scrollTop = chat.scrollHeight;
     }
 
-    document.getElementById("save-btn").addEventListener("click", function() {
-      fetch("/save", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({outfit: window.latestOutfit})
-      }).then(res => res.json()).then(data => {
-        alert("코디가 저장되었습니다!");
-      });
-    });
+    // 첫 인사
+    addMsg("{{ persona_label }} 캐릭터를 선택하셨습니다.\n어느 지역에 계신가요? (예: 서울, 부산)");
+
+    // 전송
+    async function send() {
+      const text = input.value.trim();
+      if (!text) return;
+      addMsg(text, "me");
+      input.value = "";
+      btn.disabled = true;
+
+      try {
+        const res = await fetch("/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: text })
+        });
+        const data = await res.json();
+        addMsg(data.reply || "오류가 발생했습니다.", "bot");
+      } catch (e) {
+        addMsg("네트워크 오류가 발생했습니다.", "bot");
+      } finally {
+        btn.disabled = false;
+        input.focus();
+      }
+    }
+
+    btn.addEventListener("click", (e) => { e.preventDefault(); send(); });
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") send(); });
   </script>
 </body>
 </html>
+
 
 
 
