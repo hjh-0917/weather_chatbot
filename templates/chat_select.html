@@ -1,22 +1,64 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-  <title>저장한 코디</title>
+  <meta charset="utf-8">
+  <title>캐릭터 선택</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#f5f7fb; margin:0; }
+    .wrap { max-width: 920px; margin: 40px auto; padding: 0 16px; }
+    h1 { font-size: 24px; font-weight: 700; margin: 0 0 16px; }
+    p  { color:#444; margin: 0 0 24px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; }
+    .card { background:#fff; border-radius: 16px; padding: 16px; box-shadow: 0 4px 14px rgba(0,0,0,0.07); cursor: pointer; text-align:center; transition: transform .12s ease, box-shadow .12s ease; }
+    .card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.1); }
+    .avatar { width: 96px; height: 96px; border-radius: 9999px; object-fit: cover; display:block; margin: 8px auto 12px; border: 2px solid #e8ecf4; }
+    .name { font-weight: 700; }
+    .sub { color:#666; font-size: 12px; margin-top: 4px; }
+    .foot { margin-top: 24px; color:#777; font-size: 12px; }
+  </style>
 </head>
 <body>
-  <h2>⭐ 내가 저장한 코디</h2>
-  {% if outfits %}
-    <ul>
-      {% for outfit in outfits %}
-        <li><pre>{{ outfit }}</pre></li>
-      {% endfor %}
-    </ul>
-  {% else %}
-    <p>아직 저장한 코디가 없습니다.</p>
-  {% endif %}
+  <div class="wrap">
+    <h1>옷 코디 챗봇</h1>
+    <p>캐릭터를 선택해주세요.</p>
 
-  <a href="/">⬅ 메인으로 돌아가기</a>
+    <div class="grid" id="personaGrid">
+      {% for key, label in persona_label.items() %}
+      <div class="card" data-persona="{{ key }}">
+        <img class="avatar" src="{{ url_for('static', filename='images/' + persona_image[key]) }}" alt="{{ label }}">
+        <div class="name">{{ label }}</div>
+        <div class="sub">{{ key }}</div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="foot">이미지는 <code>/static/images</code> 폴더의 PNG를 사용합니다.</div>
+  </div>
+
+  <form id="startForm" method="post" action="/start" style="display:none;">
+    <input type="hidden" name="persona" id="personaInput">
+  </form>
+
+  <script>
+    document.querySelectorAll(".card").forEach(card => {
+      card.addEventListener("click", async () => {
+        const persona = card.getAttribute("data-persona");
+        const form = document.getElementById("startForm");
+        document.getElementById("personaInput").value = persona;
+
+        const formData = new FormData(form);
+        const res = await fetch("/start", { method: "POST", body: formData });
+        const data = await res.json();
+        if (data.ok) {
+          window.location.href = "/chat";
+        } else {
+          alert(data.error || "시작에 실패했습니다.");
+        }
+      });
+    });
+  </script>
 </body>
 </html>
+
 
